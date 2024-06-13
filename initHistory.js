@@ -1,5 +1,8 @@
 const createBrowser = require('./puppeteer')
 const PriceModel = require('./models/pagePrice');
+const config = require('./config/index')
+const ora = require('ora');
+const spinner = ora('历史数据导入');
 
 const getMajorCategory = async (browser) => {
   const page = await browser.newPage();
@@ -42,8 +45,7 @@ const getCategoryAll = async (browser, item) => {
   return pager
 }
 
-
-const getCurrentAllLink = async (browser, targetPage, { name }) => {
+const getCurrentAllLink = async (browser, targetPage, { name, id }) => {
   const page = await browser.newPage();
   await page.goto(targetPage);
   const pager = await page.evaluate(() => {
@@ -53,11 +55,14 @@ const getCurrentAllLink = async (browser, targetPage, { name }) => {
       const time = line.querySelector('span')
       const element = line.querySelector('a')
       const link = element.getAttribute('href')
-      linkList.push({ link, time: time.textContent, title: element.title })
+      linkList.push({ link, publicTime: time.textContent, title: element.title })
     })
     return linkList
   });
-  pager.forEach(i => i.majorName = name)
+  pager.forEach(i => {
+    i.majorName = name
+    i.majorId = id
+  })
   page.close()
   return pager
 }
@@ -66,8 +71,9 @@ const circularPagination = async (browser, pagerInfo, item) => {
   const page = await browser.newPage();
   const { first, last, baseUrl } = pagerInfo
   const pageListSite = []
-  let curNumber = first
-  while (curNumber <= 1) {
+  let curNumber = config.grabStartPage
+  while (curNumber <= config.grabEndPage) {
+    spinner.text = `找第${curNumber}页链接`
     curNumber++
     const curPage = pagerInfo.baseUrl.replace(/\d+\.html$/, `${curNumber}.html`)
     const siteList = await getCurrentAllLink(browser, curPage, item)
@@ -78,7 +84,7 @@ const circularPagination = async (browser, pagerInfo, item) => {
 
 const getSinglePageValue = async (browser, pagerInfo) => {
   const page = await browser.newPage();
-  const { link, time, title, majorName } = pagerInfo
+  const { link, time, title } = pagerInfo
   await page.goto(link);
   const dataInfo = await page.evaluate(() => {
     function tableToJson(table) {
@@ -126,16 +132,20 @@ module.exports = async function initData () {
   const browser = await createBrowser()
   const majorCategorys = await getMajorCategory(browser)
   const allLinks = []
+  spinner.start()
   for (var index = 0; index < majorCategorys.length; index++) {
-    const item = majorCategorys[index]
-    const pagerInfo = await getCategoryAll(browser, item)
-    if (index === 0) {
+    // 目前只要第0个主类
+    if (config.grabCategoryIds.includes(majorCategorys[index].id)) {
+      const item = majorCategorys[index]
+      const pagerInfo = await getCategoryAll(browser, item)
+      spinner.text = `页码解析完成`
+      // 计算出所有主类页面链接
       let majorLinks = await circularPagination(browser, pagerInfo, item)
+      spinner.text = `开始抓单条数据`
       for (let line of majorLinks) {
         const pageData = await getSinglePageValue(browser, line)
         try {
           let priceData = new PriceModel({ ...line, priceInfo: pageData });
-          console.log({ ...line, priceInfo: pageData })
           await priceData.save();
         }catch(e) {
           console.log(e)
@@ -143,6 +153,7 @@ module.exports = async function initData () {
       }
     }
   }
+  spinner.stop()
   return allLinks
 }
 
