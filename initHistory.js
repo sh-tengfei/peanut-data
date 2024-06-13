@@ -1,5 +1,5 @@
 const createBrowser = require('./puppeteer')
-const linkModel = require('./models/pageLink');
+const PriceModel = require('./models/pagePrice');
 
 const getMajorCategory = async (browser) => {
   const page = await browser.newPage();
@@ -67,13 +67,59 @@ const circularPagination = async (browser, pagerInfo, item) => {
   const { first, last, baseUrl } = pagerInfo
   const pageListSite = []
   let curNumber = first
-  while (curNumber <= 10) {
+  while (curNumber <= 1) {
     curNumber++
     const curPage = pagerInfo.baseUrl.replace(/\d+\.html$/, `${curNumber}.html`)
     const siteList = await getCurrentAllLink(browser, curPage, item)
     pageListSite.push(...siteList)
   }
   return pageListSite
+}
+
+const getSinglePageValue = async (browser, pagerInfo) => {
+  const page = await browser.newPage();
+  const { link, time, title, majorName } = pagerInfo
+  await page.goto(link);
+  const dataInfo = await page.evaluate(() => {
+    function tableToJson(table) {
+      let data = [];
+      // 遍历每一行
+      for (let i = 1, row; row = table.rows[i]; i++) {
+        let rowData = {};
+        // 遍历每一列
+        for (let j = 0, col; col = row.cells[j]; j++) {
+          rowData[table.rows[0].cells[j].textContent] = col.textContent.replace(/\s/ig, '');
+        }
+        data.push(rowData);
+      }
+      return data;
+    }
+    function lineToJson(values) {
+      let data = [];
+      // 遍历每一行
+      for (let i = 0; i < values.length; i++) {
+        let line = values[i]
+        data.push(line.textContent.split('\n'));
+      }
+      return data;
+    }
+    let tableList = null
+    let lineList = null
+    let table = document.querySelector('.td-nei-content table');
+    if (table) {
+      tableList = tableToJson(table);
+    }
+    let values = document.querySelectorAll('div[style="padding-left: 2em"]');
+    if(values) {
+      lineList = lineToJson([...values])
+    }
+    return {
+      lineList,
+      tableList
+    }
+  });
+
+  return dataInfo
 }
 
 module.exports = async function initData () {
@@ -85,8 +131,16 @@ module.exports = async function initData () {
     const pagerInfo = await getCategoryAll(browser, item)
     if (index === 0) {
       let majorLinks = await circularPagination(browser, pagerInfo, item)
-      allLinks.push({ name: item.name, majorLinks })
-      const result = await linkModel.insertMany(majorLinks)
+      for (let line of majorLinks) {
+        const pageData = await getSinglePageValue(browser, line)
+        try {
+          let priceData = new PriceModel({ ...line, priceInfo: pageData });
+          console.log({ ...line, priceInfo: pageData })
+          await priceData.save();
+        }catch(e) {
+          console.log(e)
+        }
+      }
     }
   }
   return allLinks
