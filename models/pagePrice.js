@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-// 单个价格
-const PagePrice = new Schema({
+// 花生价格
+const PeanutPrice = new Schema({
   link: String, // 链接地址
   title: String, // 链接名称
   majorName: String, //归属主类
@@ -14,4 +14,4 @@ const PagePrice = new Schema({
   }
 }, { versionKey:false });
 
-module.exports = mongoose.model('pagePrice', PagePrice);
+module.exports = mongoose.model('peanutPrice', PeanutPrice);

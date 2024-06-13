@@ -23,7 +23,7 @@ const getMajorCategory = async (browser) => {
     })
     return resultList;
   });
-  page.close()
+  await page.close()
   return categorys
 }
 
@@ -41,7 +41,7 @@ const getCategoryAll = async (browser, item) => {
     })
     return { first: resultList.shift(), last: resultList.pop(), baseUrl: location.href };
   });
-  page.close()
+  await page.close()
   return pager
 }
 
@@ -63,7 +63,7 @@ const getCurrentAllLink = async (browser, targetPage, { name, id }) => {
     i.majorName = name
     i.majorId = id
   })
-  page.close()
+  await page.close()
   return pager
 }
 
@@ -79,6 +79,7 @@ const circularPagination = async (browser, pagerInfo, item) => {
     const siteList = await getCurrentAllLink(browser, curPage, item)
     pageListSite.push(...siteList)
   }
+  await page.close()
   return pageListSite
 }
 
@@ -124,15 +125,15 @@ const getSinglePageValue = async (browser, pagerInfo) => {
       tableList
     }
   });
-
+  await page.close()
   return dataInfo
 }
 
 module.exports = async function initData () {
+  spinner.start()
   const browser = await createBrowser()
   const majorCategorys = await getMajorCategory(browser)
   const allLinks = []
-  spinner.start()
   for (var index = 0; index < majorCategorys.length; index++) {
     // 目前只要第0个主类
     if (config.grabCategoryIds.includes(majorCategorys[index].id)) {
@@ -141,9 +142,12 @@ module.exports = async function initData () {
       spinner.text = `页码解析完成`
       // 计算出所有主类页面链接
       let majorLinks = await circularPagination(browser, pagerInfo, item)
+      allLinks.push(...majorLinks)
       spinner.text = `开始抓单条数据`
-      for (let line of majorLinks) {
+      for (let index in majorLinks) {
+        const line = majorLinks[index]
         const pageData = await getSinglePageValue(browser, line)
+        spinner.text = `共${majorLinks.length}条, 第${(Number(index) + 1)}条数据`
         try {
           let priceData = new PriceModel({ ...line, priceInfo: pageData });
           await priceData.save();
