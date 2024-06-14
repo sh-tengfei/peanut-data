@@ -1,5 +1,6 @@
 const createBrowser = require('./puppeteer')
 const PriceModel = require('./models/pagePrice');
+const MajorCategoryModel = require('./models/majorCategory');
 const config = require('./config/index')
 const ora = require('ora');
 const spinner = ora('历史数据导入');
@@ -138,6 +139,8 @@ module.exports = async function initData () {
     // 目前只要第0个主类
     if (config.grabCategoryIds.includes(majorCategorys[index].id)) {
       const item = majorCategorys[index]
+      const majorCategory = new MajorCategoryModel(item)
+      majorCategory.save()
       const pagerInfo = await getCategoryAll(browser, item)
       spinner.text = `页码解析完成`
       // 计算出所有主类页面链接

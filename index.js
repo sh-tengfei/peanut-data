@@ -6,9 +6,9 @@ const linkModel = require('./models/pagePrice');
 
 (async () => {
   await connect();
-  const link = await linkModel.find({})
-  if (!link.length) {
+  // const link = await linkModel.find({})
+  // if (!link.length) {
     const links = await initData()
     console.log('stf done', links.length)
-  }
+  // }
 })();

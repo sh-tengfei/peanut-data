@@ -1,5 +1,5 @@
 module.exports = {
-  grabStartPage: 1,
-  grabEndPage: 100,
+  grabStartPage: 100,
+  grabEndPage: 200,
   grabCategoryIds: [0]
 }
